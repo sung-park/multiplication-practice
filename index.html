@@ -143,6 +143,61 @@ html, body {
 .matrix-table .row-highlight td.cell-correct { background: #F5F5F5; }
 .matrix-table .col-highlight { background: #F5F5F5 !important; }
 
+/* === Missile & Explosion === */
+.missile {
+  position: fixed; z-index: 200; pointer-events: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--theme-color);
+  box-shadow: 0 0 12px var(--theme-color), 0 0 24px var(--theme-color);
+  transition: none;
+}
+.missile-trail {
+  position: fixed; z-index: 199; pointer-events: none;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--theme-color);
+  opacity: 0.5;
+  animation: trailFade 0.4s ease forwards;
+}
+@keyframes trailFade { to { opacity: 0; transform: scale(0.2); } }
+
+.explosion {
+  position: fixed; z-index: 201; pointer-events: none;
+  width: 60px; height: 60px; margin-left: -30px; margin-top: -30px;
+  border-radius: 50%;
+  animation: explode 0.6s ease forwards;
+}
+@keyframes explode {
+  0% { transform: scale(0.3); opacity: 1; box-shadow: 0 0 0 0 var(--theme-color); }
+  40% { transform: scale(1.5); opacity: 0.9; box-shadow: 0 0 30px 10px var(--theme-color); }
+  100% { transform: scale(2.5); opacity: 0; box-shadow: 0 0 0 0 transparent; }
+}
+.explosion-particle {
+  position: fixed; z-index: 202; pointer-events: none;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--theme-color);
+  animation: particleFly 0.6s ease forwards;
+}
+@keyframes particleFly {
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--px), var(--py)) scale(0.3); }
+}
+
+.header-boom {
+  animation: headerBoom 0.5s ease;
+}
+@keyframes headerBoom {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.5); background: #FFD54F !important; }
+  60% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* Hint pulse on blank cells */
+.cell-blank.hint-available::after {
+  content: ''; position: absolute; inset: 0;
+}
+
 /* === Input Area (shared) === */
 .input-area {
   background: #fff; border-top: 1px solid #eee; flex-shrink: 0;
@@ -677,6 +732,9 @@ function selectBlank(idx) {
   const cell = document.getElementById(`cell-${blank.row}-${blank.col}`);
   if (cell.classList.contains('cell-correct') || cell.classList.contains('cell-show-answer')) return;
 
+  // Double-tap detection for missile hint
+  handleCellDoubleTap(idx);
+
   currentBlankIdx = idx;
   userAnswer = '';
   wrongCount = 0;
@@ -890,6 +948,126 @@ function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+// ===== MISSILE HINT EFFECT =====
+function launchMissiles(blankIdx) {
+  const blank = blanks[blankIdx];
+  const cell = document.getElementById(`cell-${blank.row}-${blank.col}`);
+  const hrow = document.getElementById(`hrow-${blank.row}`);
+  const hcol = document.getElementById(`hcol-${blank.col}`);
+  if (!cell || !hrow || !hcol) return;
+
+  const cellRect = cell.getBoundingClientRect();
+  const rowRect = hrow.getBoundingClientRect();
+  const colRect = hcol.getBoundingClientRect();
+
+  const startX = cellRect.left + cellRect.width / 2;
+  const startY = cellRect.top + cellRect.height / 2;
+
+  // Launch missile to row header (left)
+  fireMissile(startX, startY, rowRect.left + rowRect.width / 2, rowRect.top + rowRect.height / 2, () => {
+    explodeAt(rowRect.left + rowRect.width / 2, rowRect.top + rowRect.height / 2);
+    hrow.classList.remove('header-boom');
+    void hrow.offsetWidth;
+    hrow.classList.add('header-boom');
+    setTimeout(() => hrow.classList.remove('header-boom'), 600);
+  });
+
+  // Launch missile to col header (up)
+  fireMissile(startX, startY, colRect.left + colRect.width / 2, colRect.top + colRect.height / 2, () => {
+    explodeAt(colRect.left + colRect.width / 2, colRect.top + colRect.height / 2);
+    hcol.classList.remove('header-boom');
+    void hcol.offsetWidth;
+    hcol.classList.add('header-boom');
+    setTimeout(() => hcol.classList.remove('header-boom'), 600);
+  });
+}
+
+function fireMissile(sx, sy, ex, ey, onArrive) {
+  const missile = document.createElement('div');
+  missile.className = 'missile';
+  missile.style.left = sx + 'px';
+  missile.style.top = sy + 'px';
+  document.body.appendChild(missile);
+
+  const duration = 350; // ms
+  const startTime = performance.now();
+  const trailInterval = 30;
+  let lastTrail = 0;
+
+  function animate(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    // Ease out quad
+    const ease = 1 - (1 - t) * (1 - t);
+
+    const cx = sx + (ex - sx) * ease;
+    const cy = sy + (ey - sy) * ease;
+    missile.style.left = cx + 'px';
+    missile.style.top = cy + 'px';
+
+    // Trail particles
+    if (now - lastTrail > trailInterval) {
+      lastTrail = now;
+      const trail = document.createElement('div');
+      trail.className = 'missile-trail';
+      trail.style.left = cx + 'px';
+      trail.style.top = cy + 'px';
+      document.body.appendChild(trail);
+      setTimeout(() => trail.remove(), 400);
+    }
+
+    if (t < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      missile.remove();
+      if (onArrive) onArrive();
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+function explodeAt(x, y) {
+  // Central explosion
+  const boom = document.createElement('div');
+  boom.className = 'explosion';
+  boom.style.left = x + 'px';
+  boom.style.top = y + 'px';
+  document.body.appendChild(boom);
+  setTimeout(() => boom.remove(), 700);
+
+  // Particles
+  const numParticles = 10;
+  for (let i = 0; i < numParticles; i++) {
+    const p = document.createElement('div');
+    p.className = 'explosion-particle';
+    const angle = (Math.PI * 2 * i) / numParticles;
+    const dist = 20 + Math.random() * 30;
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    p.style.setProperty('--px', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--py', Math.sin(angle) * dist + 'px');
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 700);
+  }
+}
+
+// Double-tap / double-click on blank cells
+let lastTapTime = 0;
+let lastTapIdx = -1;
+
+function handleCellDoubleTap(blankIdx) {
+  const now = Date.now();
+  if (lastTapIdx === blankIdx && now - lastTapTime < 400) {
+    // Double tap detected
+    launchMissiles(blankIdx);
+    lastTapTime = 0;
+    lastTapIdx = -1;
+  } else {
+    lastTapTime = now;
+    lastTapIdx = blankIdx;
   }
 }
 
