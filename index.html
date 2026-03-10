@@ -111,7 +111,10 @@ html, body {
 .matrix-table .header-col { background: var(--theme-color); color: #fff; }
 .matrix-table .header-row { background: var(--theme-color); color: #fff; }
 .matrix-table .cell-filled { background: #fff; color: #333; }
-.matrix-table .cell-blank { background: #FFF9C4; color: #999; cursor: pointer; font-style: italic; }
+.matrix-table .cell-blank {
+  background: #FFF9C4; color: #999; cursor: pointer; font-style: italic;
+  touch-action: manipulation; -webkit-touch-callout: none;
+}
 .matrix-table .cell-blank:active { background: #FFF176; }
 .matrix-table .cell-active {
   background: #E3F2FD !important; color: #333 !important; font-style: normal !important;
@@ -760,6 +763,9 @@ function selectBlank(idx) {
 
   // Double-tap detection for missile hint
   handleCellDoubleTap(idx);
+
+  // Skip re-init if already on this blank (allows double-tap without resetting state)
+  if (currentBlankIdx === idx) return;
 
   currentBlankIdx = idx;
   userAnswer = '';
