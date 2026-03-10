@@ -341,9 +341,19 @@ html, body {
   .app-title { font-size: 40px; }
   .question-hint { font-size: 36px; }
   .num-btn { height: 60px; font-size: 28px; }
-  .numpad { max-width: 400px; }
+  .numpad { max-width: 450px; }
   .choice-btn { min-width: 88px; height: 64px; font-size: 30px; }
   .feedback-msg { font-size: 56px; }
+  .matrix-container { padding: 8px 16px; }
+  .input-area { padding: 10px 24px 16px; }
+}
+
+/* Large tablet / iPad landscape */
+@media (min-width: 900px) {
+  .numpad { max-width: 500px; }
+  .choice-btn { min-width: 100px; height: 72px; font-size: 34px; }
+  .choices-grid { max-width: 520px; gap: 10px; }
+  .input-mode-toggle button { padding: 8px 24px; font-size: 15px; }
 }
 
 /* Small phone / landscape */
@@ -573,9 +583,17 @@ function generateBlanks() {
 function renderMatrix() {
   const container = document.getElementById('matrix-container');
   const op = currentMode === 'add' ? '+' : '\u00d7';
-  const availW = Math.min(window.innerWidth - 16, 500);
-  const cellSize = Math.floor(availW / (tableSize + 1));
-  const fontSize = Math.max(12, Math.min(cellSize * 0.45, 24));
+  // Fit to both width and height of available viewport
+  const availW = Math.min(window.innerWidth - 16, 600);
+  const inputArea = document.querySelector('.input-area');
+  const quizTop = document.querySelector('.quiz-top');
+  const progressBar = document.querySelector('.progress-bar-container');
+  const usedH = (quizTop ? quizTop.offsetHeight : 40) + (progressBar ? progressBar.offsetHeight : 14) + (inputArea ? inputArea.offsetHeight : 180) + 24;
+  const availH = window.innerHeight - usedH;
+  const cellFromW = Math.floor(availW / (tableSize + 1));
+  const cellFromH = Math.floor(availH / (tableSize + 1));
+  const cellSize = Math.min(cellFromW, cellFromH, 80);
+  const fontSize = Math.max(12, Math.min(cellSize * 0.45, 28));
 
   let html = `<table class="matrix-table">`;
   html += '<tr>';
