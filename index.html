@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="theme-color" content="#4A90D9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>시온이의 수학 연습</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  height: 100%; width: 100%;
+  font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  background: #F8F9FA;
+  color: #333;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* --- Screens --- */
+.screen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100%;
+  position: absolute;
+  top: 0; left: 0;
+  animation: fadeIn 0.25s ease;
+}
+.screen.active { display: flex; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* --- Home Screen --- */
+#home {
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  gap: 20px;
+}
+.app-title { font-size: 32px; font-weight: 800; text-align: center; }
+.app-subtitle { font-size: 18px; color: #888; margin-bottom: 16px; text-align: center; }
+.mode-card {
+  width: 100%;
+  max-width: 360px;
+  padding: 28px 24px;
+  border-radius: 20px;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+.mode-card:active { transform: scale(0.96); }
+.mode-card .mode-symbol { font-size: 40px; display: block; margin-bottom: 6px; }
+.mode-card .mode-desc { font-size: 14px; font-weight: 400; opacity: 0.9; margin-top: 4px; }
+.mode-add { background: linear-gradient(135deg, #4A90D9, #357ABD); }
+.mode-mul { background: linear-gradient(135deg, #F5A623, #E8961E); }
+
+/* --- Level Screen --- */
+#level-select { padding: 24px; }
+.screen-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.back-btn {
+  background: none; border: 2px solid #ddd; border-radius: 12px;
+  padding: 10px 16px; font-size: 18px; cursor: pointer; color: #666;
+}
+.back-btn:active { background: #eee; }
+.screen-title { font-size: 24px; font-weight: 700; }
+.level-list {
+  display: flex; flex-direction: column; gap: 14px; flex: 1;
+  justify-content: center; max-width: 400px; margin: 0 auto; width: 100%;
+}
+.level-card {
+  padding: 20px; border-radius: 16px; background: #fff;
+  border: 3px solid #e0e0e0; cursor: pointer; transition: transform 0.15s;
+}
+.level-card:active { transform: scale(0.97); }
+.level-card .level-name { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.level-card .level-desc { font-size: 15px; color: #888; }
+.level-card .level-stars { font-size: 18px; margin-bottom: 4px; letter-spacing: 2px; }
+
+/* --- Quiz Screen --- */
+#quiz { padding: 0; }
+.quiz-top {
+  padding: 10px 16px; display: flex; align-items: center;
+  justify-content: space-between; flex-shrink: 0;
+}
+.quiz-progress-text { font-size: 16px; font-weight: 600; color: #666; }
+.progress-bar-container { padding: 0 16px 6px; flex-shrink: 0; }
+.progress-bar-track { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+
+/* Matrix Table */
+.matrix-container {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 4px 8px; min-height: 0; overflow: auto;
+}
+.matrix-table { border-collapse: collapse; margin: 0 auto; }
+.matrix-table td, .matrix-table th {
+  text-align: center; font-weight: 700; border: 1.5px solid #ddd; transition: background 0.2s;
+}
+.matrix-table .header-corner { background: var(--theme-color); color: #fff; font-size: 1.1em; }
+.matrix-table .header-col { background: var(--theme-color); color: #fff; }
+.matrix-table .header-row { background: var(--theme-color); color: #fff; }
+.matrix-table .cell-filled { background: #fff; color: #333; }
+.matrix-table .cell-blank { background: #FFF9C4; color: #999; cursor: pointer; font-style: italic; }
+.matrix-table .cell-blank:active { background: #FFF176; }
+.matrix-table .cell-active {
+  background: #E3F2FD !important; color: #333 !important; font-style: normal !important;
+  outline: 3px solid var(--theme-color); outline-offset: -2px;
+  animation: cellPulse 1.2s infinite;
+}
+@keyframes cellPulse { 0%, 100% { outline-color: var(--theme-color); } 50% { outline-color: transparent; } }
+.matrix-table .cell-correct {
+  background: #E8F5E9 !important; color: #27AE60 !important;
+  font-style: normal !important; cursor: default;
+}
+.matrix-table .cell-correct-flash { animation: correctFlash 0.5s ease; }
+@keyframes correctFlash {
+  0% { background: #27AE60; color: #fff; transform: scale(1.15); }
+  100% { background: #E8F5E9; color: #27AE60; transform: scale(1); }
+}
+.matrix-table .cell-wrong-shake { animation: cellShake 0.4s ease; background: #FFCDD2 !important; }
+@keyframes cellShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+.matrix-table .cell-show-answer {
+  background: #BBDEFB !important; color: #1565C0 !important;
+  font-style: normal !important; cursor: default;
+}
+.matrix-table .row-highlight td.cell-filled,
+.matrix-table .row-highlight td.cell-blank,
+.matrix-table .row-highlight td.cell-correct { background: #F5F5F5; }
+.matrix-table .col-highlight { background: #F5F5F5 !important; }
+
+/* === Input Area (shared) === */
+.input-area {
+  background: #fff; border-top: 1px solid #eee; flex-shrink: 0;
+  padding: 6px 16px 12px;
+}
+
+/* Input mode toggle */
+.input-mode-toggle {
+  display: flex; justify-content: center; gap: 0; margin-bottom: 8px;
+}
+.input-mode-toggle button {
+  padding: 6px 20px; font-size: 13px; font-weight: 600;
+  border: 2px solid #ddd; background: #f5f5f5; color: #888;
+  cursor: pointer; transition: all 0.15s;
+}
+.input-mode-toggle button:first-child { border-radius: 8px 0 0 8px; border-right: none; }
+.input-mode-toggle button:last-child { border-radius: 0 8px 8px 0; }
+.input-mode-toggle button.active {
+  background: var(--theme-color); color: #fff; border-color: var(--theme-color);
+}
+
+/* === Choice Buttons === */
+.choices-container { display: none; }
+.choices-container.active { display: block; }
+.choices-label {
+  text-align: center; font-size: 15px; color: #999; margin-bottom: 6px; font-weight: 600;
+}
+.choices-grid {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  justify-content: center; max-width: 400px; margin: 0 auto;
+}
+.choice-btn {
+  min-width: 72px; height: 56px; border-radius: 14px;
+  border: 3px solid #e0e0e0; background: #fff;
+  font-size: 26px; font-weight: 800; color: #333;
+  cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 16px;
+}
+.choice-btn:active { transform: scale(0.92); }
+.choice-btn:hover { border-color: var(--theme-color); }
+.choice-btn.choice-correct {
+  background: #27AE60 !important; color: #fff !important;
+  border-color: #27AE60 !important; transform: scale(1.05);
+  animation: choiceCorrect 0.4s ease;
+}
+@keyframes choiceCorrect {
+  0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1.05); }
+}
+.choice-btn.choice-wrong {
+  background: #FFCDD2 !important; color: #E74C3C !important;
+  border-color: #E74C3C !important; animation: cellShake 0.4s ease;
+}
+.choice-btn.choice-used {
+  opacity: 0.3; pointer-events: none;
+}
+
+/* === Numpad === */
+.numpad-container { display: none; }
+.numpad-container.active { display: block; }
+.numpad {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 6px; max-width: 340px; margin: 0 auto;
+}
+.num-btn {
+  height: 52px; border-radius: 12px; border: 2px solid #e0e0e0;
+  background: #fff; font-size: 24px; font-weight: 700; color: #333;
+  cursor: pointer; transition: background 0.1s, transform 0.1s;
+  display: flex; align-items: center; justify-content: center;
+}
+.num-btn:active { background: #f0f0f0; transform: scale(0.94); }
+.num-btn.submit-btn {
+  background: var(--theme-color); color: #fff;
+  border-color: var(--theme-color); font-size: 18px;
+}
+.num-btn.submit-btn:active { opacity: 0.85; }
+.num-btn.del-btn { font-size: 20px; color: #E74C3C; border-color: #f5c6cb; }
+
+/* Feedback Overlay */
+.feedback-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  display: none; align-items: center; justify-content: center;
+  z-index: 100; pointer-events: none;
+}
+.feedback-overlay.show { display: flex; animation: feedbackPop 0.4s ease; }
+.feedback-msg {
+  font-size: 44px; font-weight: 800; padding: 16px 36px;
+  border-radius: 20px; color: #fff;
+}
+.feedback-msg.correct { background: rgba(39, 174, 96, 0.92); }
+.feedback-msg.wrong { background: rgba(231, 76, 60, 0.85); font-size: 24px; }
+@keyframes feedbackPop {
+  0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Complete overlay */
+.complete-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(39, 174, 96, 0.15);
+  display: none; align-items: center; justify-content: center; z-index: 50;
+}
+.complete-overlay.show { display: flex; animation: fadeIn 0.5s ease; }
+.complete-msg {
+  background: #fff; border-radius: 24px; padding: 32px;
+  text-align: center; box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+  max-width: 340px; width: 90%;
+}
+.complete-msg h2 { font-size: 28px; margin-bottom: 8px; }
+.complete-msg .score { font-size: 20px; color: #666; margin-bottom: 12px; }
+.complete-msg .stars { font-size: 28px; margin-bottom: 16px; letter-spacing: 2px; }
+.complete-msg .wrong-review {
+  text-align: left; background: #FFF3E0; border-radius: 12px;
+  padding: 12px; margin-bottom: 16px; max-height: 140px; overflow-y: auto;
+}
+.complete-msg .wrong-review h4 { color: #E74C3C; margin-bottom: 6px; font-size: 14px; }
+.complete-msg .wrong-review .item {
+  font-size: 15px; padding: 3px 0; display: flex; justify-content: space-between;
+}
+.complete-msg .wrong-review .item .ans { color: #27AE60; font-weight: 700; }
+.complete-msg .wrong-review .item .wrong-ans { color: #E74C3C; text-decoration: line-through; margin-left: 6px; }
+.complete-msg .btn-group { display: flex; flex-direction: column; gap: 10px; }
+.complete-msg .btn-group button {
+  padding: 14px; border-radius: 12px; border: none;
+  font-size: 18px; font-weight: 700; cursor: pointer;
+}
+.complete-msg .btn-group .btn-primary { background: var(--theme-color); color: #fff; }
+.complete-msg .btn-group .btn-secondary { background: #e9ecef; color: #555; }
+
+/* Tablet */
+@media (min-width: 600px) {
+  .mode-card { padding: 36px 28px; font-size: 28px; }
+  .app-title { font-size: 40px; }
+  .question-hint { font-size: 36px; }
+  .num-btn { height: 60px; font-size: 28px; }
+  .numpad { max-width: 400px; }
+  .choice-btn { min-width: 88px; height: 64px; font-size: 30px; }
+  .feedback-msg { font-size: 56px; }
+}
+
+/* Small phone / landscape */
+@media (max-height: 600px) {
+  .question-hint { font-size: 22px; padding: 4px 0; min-height: 30px; }
+  .num-btn { height: 44px; font-size: 20px; }
+  .choice-btn { min-width: 60px; height: 44px; font-size: 20px; }
+  .input-area { padding: 4px 12px 6px; }
+  .quiz-top { padding: 6px 12px; }
+  .progress-bar-container { padding: 0 12px 4px; }
+  .input-mode-toggle button { padding: 4px 14px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ========== HOME ========== -->
+<div id="home" class="screen active">
+  <div class="app-title">시온이의 수학 연습</div>
+  <div class="app-subtitle">덧셈표와 곱셈표를 채워봐!</div>
+  <button class="mode-card mode-add" onclick="selectMode('add')">
+    <span class="mode-symbol">+</span>
+    덧셈표
+    <span class="mode-desc">더하기 표를 채워봐!</span>
+  </button>
+  <button class="mode-card mode-mul" onclick="selectMode('mul')">
+    <span class="mode-symbol">&times;</span>
+    곱셈표
+    <span class="mode-desc">구구단 표를 채워봐!</span>
+  </button>
+</div>
+
+<!-- ========== LEVEL SELECT ========== -->
+<div id="level-select" class="screen">
+  <div class="screen-header">
+    <button class="back-btn" onclick="goHome()">&#8592; 뒤로</button>
+    <div class="screen-title" id="level-title">단계 선택</div>
+  </div>
+  <div class="level-list" id="level-list"></div>
+</div>
+
+<!-- ========== QUIZ ========== -->
+<div id="quiz" class="screen">
+  <div class="quiz-top">
+    <button class="back-btn" onclick="confirmQuit()" style="padding:8px 12px;font-size:16px;">&#8592;</button>
+    <div class="quiz-progress-text" id="quiz-progress-text"></div>
+  </div>
+  <div class="progress-bar-container">
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progress-bar-fill"></div>
+    </div>
+  </div>
+  <div class="matrix-container" id="matrix-container"></div>
+
+  <!-- Input Area: Choice + Numpad -->
+  <div class="input-area">
+    <div class="input-mode-toggle">
+      <button id="toggle-choice" class="active" onclick="setInputMode('choice')">보기 선택</button>
+      <button id="toggle-numpad" onclick="setInputMode('numpad')">직접 입력</button>
+    </div>
+
+    <!-- Choice Mode -->
+    <div class="choices-container active" id="choices-container">
+      <div class="choices-label">답을 골라봐!</div>
+      <div class="choices-grid" id="choices-grid"></div>
+    </div>
+
+    <!-- Numpad Mode -->
+    <div class="numpad-container" id="numpad-container">
+      <div class="numpad">
+        <button class="num-btn" onclick="inputNum(1)">1</button>
+        <button class="num-btn" onclick="inputNum(2)">2</button>
+        <button class="num-btn" onclick="inputNum(3)">3</button>
+        <button class="num-btn del-btn" onclick="deleteLast()">&#9003;</button>
+        <button class="num-btn" onclick="inputNum(4)">4</button>
+        <button class="num-btn" onclick="inputNum(5)">5</button>
+        <button class="num-btn" onclick="inputNum(6)">6</button>
+        <button class="num-btn submit-btn" id="submit-btn" onclick="checkAnswer()" style="grid-row: span 2;">확인</button>
+        <button class="num-btn" onclick="inputNum(7)">7</button>
+        <button class="num-btn" onclick="inputNum(8)">8</button>
+        <button class="num-btn" onclick="inputNum(9)">9</button>
+        <button class="num-btn" onclick="inputNum(0)" style="grid-column: span 3;">0</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="feedback-overlay" id="feedback-overlay">
+    <div class="feedback-msg" id="feedback-msg"></div>
+  </div>
+  <div class="complete-overlay" id="complete-overlay">
+    <div class="complete-msg" id="complete-msg"></div>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+let currentMode = '';
+let currentLevel = 0;
+let tableSize = 3;
+let blanks = [];
+let currentBlankIdx = 0;
+let userAnswer = '';
+let wrongCount = 0;
+let results = [];
+let solvedCount = 0;
+let inputMode = 'choice'; // 'choice' | 'numpad'
+let currentChoices = [];
+let isProcessing = false; // prevent double-tap
+
+const THEME = { add: '#4A90D9', mul: '#F5A623' };
+const PRAISE = {
+  perfect: ['완벽해요! 천재!', '만점! 최고야!', '다 맞았어!'],
+  great: ['참 잘했어요!', '거의 다 맞았어!', '대단해!'],
+  good: ['잘하고 있어!', '조금만 더 힘내!'],
+  encourage: ['괜찮아! 다시 해보자!', '연습하면 잘할 수 있어!']
+};
+const CORRECT_MSG = ['잘했어!', '대단해!', '멋져!', '정답!', '최고!'];
+const WRONG_MSG = ['다시 해봐!', '아깝다!', '한번 더!'];
+
+// ===== NAVIGATION =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goHome() { showScreen('home'); }
+function confirmQuit() {
+  if (solvedCount > 0 && solvedCount < blanks.length) {
+    if (!confirm('그만할까? 지금까지 푼 건 사라져요.')) return;
+  }
+  showScreen('level-select');
+}
+
+// ===== INPUT MODE =====
+function setInputMode(mode) {
+  inputMode = mode;
+  document.getElementById('toggle-choice').classList.toggle('active', mode === 'choice');
+  document.getElementById('toggle-numpad').classList.toggle('active', mode === 'numpad');
+  document.getElementById('choices-container').classList.toggle('active', mode === 'choice');
+  document.getElementById('numpad-container').classList.toggle('active', mode === 'numpad');
+
+  if (mode === 'choice') {
+    renderChoices();
+  }
+  userAnswer = '';
+
+}
+
+// ===== MODE SELECT =====
+function selectMode(mode) {
+  currentMode = mode;
+  document.documentElement.style.setProperty('--theme-color', THEME[mode]);
+  renderLevels();
+  showScreen('level-select');
+}
+
+function renderLevels() {
+  const titles = { add: '덧셈표', mul: '곱셈표' };
+  document.getElementById('level-title').textContent = titles[currentMode] + ' - 단계 선택';
+  const levels = [
+    { size: 3, name: '1단계 (3x3)', desc: '1~3 아주 쉬운 표', stars: '\u2605\u2606\u2606\u2606' },
+    { size: 5, name: '2단계 (5x5)', desc: '1~5 쉬운 표', stars: '\u2605\u2605\u2606\u2606' },
+    { size: 7, name: '3단계 (7x7)', desc: '1~7 보통 표', stars: '\u2605\u2605\u2605\u2606' },
+    { size: 9, name: '4단계 (9x9)', desc: '1~9 도전! 전체 표', stars: '\u2605\u2605\u2605\u2605' },
+  ];
+  const list = document.getElementById('level-list');
+  list.innerHTML = '';
+  levels.forEach((lv, i) => {
+    const card = document.createElement('div');
+    card.className = 'level-card';
+    card.style.borderColor = THEME[currentMode];
+    card.innerHTML = `
+      <div class="level-stars">${lv.stars}</div>
+      <div class="level-name">${lv.name}</div>
+      <div class="level-desc">${lv.desc}</div>
+    `;
+    card.onclick = () => startQuiz(i, lv.size);
+    list.appendChild(card);
+  });
+}
+
+// ===== QUIZ SETUP =====
+function startQuiz(level, size) {
+  currentLevel = level;
+  tableSize = size;
+  solvedCount = 0;
+  results = [];
+  wrongCount = 0;
+  userAnswer = '';
+  isProcessing = false;
+
+  generateBlanks();
+  currentBlankIdx = 0;
+
+  showScreen('quiz');
+  document.getElementById('complete-overlay').classList.remove('show');
+  renderMatrix();
+  highlightCurrentBlank();
+  updateProgress();
+
+  if (inputMode === 'choice') renderChoices();
+}
+
+function generateBlanks() {
+  let numBlanks;
+  if (tableSize === 3) numBlanks = randInt(3, 4);
+  else if (tableSize === 5) numBlanks = randInt(6, 8);
+  else if (tableSize === 7) numBlanks = randInt(10, 14);
+  else numBlanks = randInt(15, 20);
+
+  const allPositions = [];
+  for (let r = 1; r <= tableSize; r++) {
+    for (let c = 1; c <= tableSize; c++) {
+      allPositions.push({ row: r, col: c });
+    }
+  }
+  shuffle(allPositions);
+
+  blanks = allPositions.slice(0, numBlanks).map(pos => ({
+    row: pos.row,
+    col: pos.col,
+    answer: currentMode === 'add' ? pos.row + pos.col : pos.row * pos.col
+  }));
+  blanks.sort((a, b) => a.row !== b.row ? a.row - b.row : a.col - b.col);
+}
+
+// ===== RENDER MATRIX =====
+function renderMatrix() {
+  const container = document.getElementById('matrix-container');
+  const op = currentMode === 'add' ? '+' : '\u00d7';
+  const availW = Math.min(window.innerWidth - 16, 500);
+  const cellSize = Math.floor(availW / (tableSize + 1));
+  const fontSize = Math.max(12, Math.min(cellSize * 0.45, 24));
+
+  let html = `<table class="matrix-table">`;
+  html += '<tr>';
+  html += `<td class="header-corner" style="width:${cellSize}px;height:${cellSize}px;font-size:${fontSize}px">${op}</td>`;
+  for (let c = 1; c <= tableSize; c++) {
+    html += `<td class="header-col" id="hcol-${c}" style="width:${cellSize}px;height:${cellSize}px;font-size:${fontSize}px">${c}</td>`;
+  }
+  html += '</tr>';
+
+  for (let r = 1; r <= tableSize; r++) {
+    html += `<tr id="row-${r}">`;
+    html += `<td class="header-row" id="hrow-${r}" style="width:${cellSize}px;height:${cellSize}px;font-size:${fontSize}px">${r}</td>`;
+    for (let c = 1; c <= tableSize; c++) {
+      const val = currentMode === 'add' ? r + c : r * c;
+      const blankIdx = blanks.findIndex(b => b.row === r && b.col === c);
+      const isBlank = blankIdx >= 0;
+      const cellId = `cell-${r}-${c}`;
+
+      if (isBlank) {
+        html += `<td id="${cellId}" class="cell-blank" data-blank-idx="${blankIdx}"
+                  style="width:${cellSize}px;height:${cellSize}px;font-size:${fontSize}px"
+                  onclick="selectBlank(${blankIdx})">?</td>`;
+      } else {
+        html += `<td id="${cellId}" class="cell-filled"
+                  style="width:${cellSize}px;height:${cellSize}px;font-size:${fontSize}px">${val}</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+// ===== CHOICES =====
+function generateChoices(answer) {
+  const choices = new Set([answer]);
+  // Generate distractors close to the answer
+  const range = currentMode === 'mul' ? 3 : 2;
+  let attempts = 0;
+  while (choices.size < 5 && attempts < 50) {
+    let distractor;
+    const strategy = Math.random();
+    if (strategy < 0.5) {
+      // Close to answer (+/- range)
+      distractor = answer + randInt(-range, range);
+    } else if (strategy < 0.75) {
+      // Common confusion: if mul, show add result; if add, show mul result
+      const blank = blanks[currentBlankIdx];
+      if (currentMode === 'mul') {
+        distractor = blank.row + blank.col; // addition instead of multiplication
+      } else {
+        distractor = blank.row * blank.col; // multiplication instead of addition
+      }
+    } else {
+      // Random from table range
+      if (currentMode === 'add') {
+        distractor = randInt(2, tableSize * 2);
+      } else {
+        distractor = randInt(1, tableSize * tableSize);
+      }
+    }
+    if (distractor > 0 && distractor !== answer) {
+      choices.add(distractor);
+    }
+    attempts++;
+  }
+
+  const arr = Array.from(choices);
+  shuffle(arr);
+  return arr;
+}
+
+function renderChoices() {
+  if (currentBlankIdx >= blanks.length) {
+    document.getElementById('choices-grid').innerHTML = '';
+    return;
+  }
+  const blank = blanks[currentBlankIdx];
+  const cell = document.getElementById(`cell-${blank.row}-${blank.col}`);
+  if (cell && (cell.classList.contains('cell-correct') || cell.classList.contains('cell-show-answer'))) {
+    document.getElementById('choices-grid').innerHTML = '';
+    return;
+  }
+
+  currentChoices = generateChoices(blank.answer);
+  const grid = document.getElementById('choices-grid');
+  grid.innerHTML = '';
+  currentChoices.forEach(val => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = val;
+    btn.onclick = () => selectChoice(val, btn);
+    grid.appendChild(btn);
+  });
+}
+
+function selectChoice(val, btnEl) {
+  if (isProcessing) return;
+  if (currentBlankIdx >= blanks.length) return;
+
+  const blank = blanks[currentBlankIdx];
+  const cell = document.getElementById(`cell-${blank.row}-${blank.col}`);
+
+  if (val === blank.answer) {
+    // CORRECT
+    isProcessing = true;
+    btnEl.classList.add('choice-correct');
+
+    results.push({ row: blank.row, col: blank.col, answer: blank.answer, userAns: val, isCorrect: true, wasShown: false });
+    solvedCount++;
+    updateProgress();
+
+    cell.classList.remove('cell-active', 'cell-blank');
+    cell.classList.add('cell-correct', 'cell-correct-flash');
+    cell.textContent = blank.answer;
+
+    showFeedback(true);
+    setTimeout(() => {
+      hideFeedback();
+      isProcessing = false;
+      moveToNextBlank();
+    }, 700);
+  } else {
+    // WRONG
+    isProcessing = true;
+    wrongCount++;
+    btnEl.classList.add('choice-wrong');
+
+    cell.classList.add('cell-wrong-shake');
+    setTimeout(() => cell.classList.remove('cell-wrong-shake'), 400);
+
+    showFeedback(false);
+    setTimeout(() => {
+      hideFeedback();
+      btnEl.classList.remove('choice-wrong');
+      btnEl.classList.add('choice-used');
+
+      if (wrongCount >= 3) {
+        results.push({ row: blank.row, col: blank.col, answer: blank.answer, userAns: val, isCorrect: false, wasShown: true });
+        solvedCount++;
+        updateProgress();
+
+        cell.classList.remove('cell-active', 'cell-blank');
+        cell.classList.add('cell-show-answer');
+        cell.textContent = blank.answer;
+
+        setTimeout(() => {
+          isProcessing = false;
+          moveToNextBlank();
+        }, 1500);
+      } else {
+        isProcessing = false;
+      }
+    }, 600);
+  }
+}
+
+// ===== BLANK INTERACTION =====
+function selectBlank(idx) {
+  if (isProcessing) return;
+  const blank = blanks[idx];
+  const cell = document.getElementById(`cell-${blank.row}-${blank.col}`);
+  if (cell.classList.contains('cell-correct') || cell.classList.contains('cell-show-answer')) return;
+
+  currentBlankIdx = idx;
+  userAnswer = '';
+  wrongCount = 0;
+  highlightCurrentBlank();
+
+  if (inputMode === 'choice') renderChoices();
+}
+
+function highlightCurrentBlank() {
+  document.querySelectorAll('.matrix-table td').forEach(td => {
+    td.classList.remove('cell-active', 'col-highlight');
+    td.style.outline = '';
+  });
+  document.querySelectorAll('.matrix-table tr').forEach(tr => {
+    tr.classList.remove('row-highlight');
+  });
+
+  if (currentBlankIdx >= blanks.length) return;
+  const blank = blanks[currentBlankIdx];
+  const cell = document.getElementById(`cell-${blank.row}-${blank.col}`);
+  if (!cell || cell.classList.contains('cell-correct') || cell.classList.contains('cell-show-answer')) return;
+
+  cell.classList.add('cell-active');
+
+  const row = document.getElementById(`row-${blank.row}`);
+  if (row) row.classList.add('row-highlight');
+
+  for (let r = 1; r <= tableSize; r++) {
+    const c = document.getElementById(`cell-${r}-${blank.col}`);
+    if (c && !c.classList.contains('cell-active')) c.classList.add('col-highlight');
+  }
+
+  const hrow = document.getElementById(`hrow-${blank.row}`);
+  const hcol = document.getElementById(`hcol-${blank.col}`);
+  if (hrow) { hrow.style.outline = '3px solid #fff'; hrow.style.outlineOffset = '-2px'; }
+  if (hcol) { hcol.style.outline = '3px solid #fff'; hcol.style.outlineOffset = '-2px'; }
+}
+
+function updateProgress() {
+  const total = blanks.length;
+  const pct = total > 0 ? (solvedCount / total) * 100 : 0;
+  document.getElementById('quiz-progress-text').textContent = `${solvedCount} / ${total}`;
+  const fill = document.getElementById('progress-bar-fill');
+  fill.style.width = pct + '%';
+  fill.style.background = THEME[currentMode];
+}
+
+// ===== NUMPAD INPUT =====
+function inputNum(n) {
+  if (isProcessing) return;
+  if (currentBlankIdx >= blanks.length) return;
+  if (userAnswer.length >= 3) return;
+  userAnswer += n;
+
+  const blank = blanks[currentBlankIdx];
+  const cell = document.getElementById(`cell-${blank.row}-${blank.col}`);
+  if (cell && cell.classList.contains('cell-active')) {
+    cell.textContent = userAnswer;
+  }
+}
+
+function deleteLast() {
+  if (isProcessing) return;
+  userAnswer = userAnswer.slice(0, -1);
+
+  const blank = blanks[currentBlankIdx];
+  const cell = document.getElementById(`cell-${blank.row}-${blank.col}`);
+  if (cell && cell.classList.contains('cell-active')) {
+    cell.textContent = userAnswer || '?';
+  }
+}
+
+function checkAnswer() {
+  if (isProcessing) return;
+  if (!userAnswer || currentBlankIdx >= blanks.length) return;
+  const blank = blanks[currentBlankIdx];
+  const ans = parseInt(userAnswer, 10);
+  const cell = document.getElementById(`cell-${blank.row}-${blank.col}`);
+
+  if (ans === blank.answer) {
+    isProcessing = true;
+    results.push({ row: blank.row, col: blank.col, answer: blank.answer, userAns: ans, isCorrect: true, wasShown: false });
+    solvedCount++;
+    updateProgress();
+    cell.classList.remove('cell-active', 'cell-blank');
+    cell.classList.add('cell-correct', 'cell-correct-flash');
+    cell.textContent = blank.answer;
+    showFeedback(true);
+    setTimeout(() => { hideFeedback(); isProcessing = false; moveToNextBlank(); }, 700);
+  } else {
+    isProcessing = true;
+    wrongCount++;
+    showFeedback(false);
+    cell.classList.add('cell-wrong-shake');
+    setTimeout(() => cell.classList.remove('cell-wrong-shake'), 400);
+    setTimeout(() => {
+      hideFeedback();
+      if (wrongCount >= 3) {
+        results.push({ row: blank.row, col: blank.col, answer: blank.answer, userAns: ans, isCorrect: false, wasShown: true });
+        solvedCount++;
+        updateProgress();
+        cell.classList.remove('cell-active', 'cell-blank');
+        cell.classList.add('cell-show-answer');
+        cell.textContent = blank.answer;
+        setTimeout(() => { isProcessing = false; moveToNextBlank(); }, 1500);
+      } else {
+        userAnswer = '';
+        cell.textContent = '?';
+      
+        isProcessing = false;
+      }
+    }, 600);
+  }
+}
+
+function moveToNextBlank() {
+  userAnswer = '';
+  wrongCount = 0;
+
+  let nextIdx = -1;
+  for (let i = 0; i < blanks.length; i++) {
+    const b = blanks[i];
+    const c = document.getElementById(`cell-${b.row}-${b.col}`);
+    if (c && !c.classList.contains('cell-correct') && !c.classList.contains('cell-show-answer')) {
+      nextIdx = i;
+      break;
+    }
+  }
+
+  if (nextIdx === -1) {
+    currentBlankIdx = blanks.length;
+    highlightCurrentBlank();
+  
+    if (inputMode === 'choice') document.getElementById('choices-grid').innerHTML = '';
+    setTimeout(() => showComplete(), 500);
+  } else {
+    currentBlankIdx = nextIdx;
+    highlightCurrentBlank();
+  
+    if (inputMode === 'choice') renderChoices();
+  }
+}
+
+// ===== FEEDBACK =====
+function showFeedback(correct) {
+  const overlay = document.getElementById('feedback-overlay');
+  const msg = document.getElementById('feedback-msg');
+  overlay.classList.add('show');
+  msg.className = correct ? 'feedback-msg correct' : 'feedback-msg wrong';
+  msg.textContent = correct ? pick(CORRECT_MSG) : pick(WRONG_MSG);
+}
+function hideFeedback() {
+  document.getElementById('feedback-overlay').classList.remove('show');
+}
+
+// ===== COMPLETE =====
+function showComplete() {
+  const correct = results.filter(r => r.isCorrect).length;
+  const total = results.length;
+  const pct = total > 0 ? correct / total : 0;
+
+  let msgList;
+  if (pct === 1) msgList = PRAISE.perfect;
+  else if (pct >= 0.8) msgList = PRAISE.great;
+  else if (pct >= 0.5) msgList = PRAISE.good;
+  else msgList = PRAISE.encourage;
+
+  const wrongs = results.filter(r => !r.isCorrect);
+  const op = currentMode === 'add' ? '+' : '\u00d7';
+
+  let wrongHtml = '';
+  if (wrongs.length > 0) {
+    wrongHtml = `<div class="wrong-review"><h4>틀린 문제</h4>`;
+    wrongs.forEach(w => {
+      wrongHtml += `<div class="item">
+        <span>${w.row} ${op} ${w.col} = <span class="ans">${w.answer}</span></span>
+        <span class="wrong-ans">${w.userAns}</span>
+      </div>`;
+    });
+    wrongHtml += `</div>`;
+  }
+
+  let stars = '';
+  for (let i = 0; i < total; i++) {
+    stars += i < correct ? '\u2605' : '\u2606';
+  }
+
+  const msgEl = document.getElementById('complete-msg');
+  msgEl.innerHTML = `
+    <h2>${pick(msgList)}</h2>
+    <div class="score">${total}개 중 ${correct}개 정답!</div>
+    <div class="stars" style="color: #F5A623;">${stars}</div>
+    ${wrongHtml}
+    <div class="btn-group">
+      <button class="btn-primary" onclick="startQuiz(${currentLevel}, ${tableSize})">같은 표 다시 풀기</button>
+      <button class="btn-secondary" onclick="hideComplete(); selectMode('${currentMode}')">다른 단계 선택</button>
+      <button class="btn-secondary" onclick="hideComplete(); goHome()">처음으로</button>
+    </div>
+  `;
+  document.getElementById('complete-overlay').classList.add('show');
+}
+
+function hideComplete() {
+  document.getElementById('complete-overlay').classList.remove('show');
+}
+
+// ===== UTILS =====
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+// ===== KEYBOARD (desktop) =====
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('quiz').classList.contains('active')) return;
+  if (document.getElementById('complete-overlay').classList.contains('show')) return;
+  if (inputMode !== 'numpad') return;
+  if (e.key >= '0' && e.key <= '9') inputNum(parseInt(e.key));
+  else if (e.key === 'Backspace') deleteLast();
+  else if (e.key === 'Enter') checkAnswer();
+});
+
+// ===== RESIZE =====
+window.addEventListener('resize', () => {
+  if (document.getElementById('quiz').classList.contains('active') &&
+      !document.getElementById('complete-overlay').classList.contains('show')) {
+    renderMatrix();
+    highlightCurrentBlank();
+  }
+});
+
+// ===== SERVICE WORKER =====
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

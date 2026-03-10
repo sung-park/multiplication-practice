@@ -1,0 +1,15 @@
+{
+  "name": "시온이의 수학 연습",
+  "short_name": "수학 연습",
+  "description": "덧셈과 곱셈을 재미있게 연습하는 교육 앱",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#4A90D9",
+  "background_color": "#F8F9FA",
+  "start_url": "./index.html",
+  "scope": "./",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
