@@ -146,20 +146,28 @@ html, body {
 /* === Missile & Explosion === */
 .missile {
   position: fixed; z-index: 200; pointer-events: none;
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  background: var(--theme-color);
-  box-shadow: 0 0 12px var(--theme-color), 0 0 24px var(--theme-color);
+  width: 28px; height: 28px;
+  font-size: 24px;
+  line-height: 28px;
+  text-align: center;
+  filter: drop-shadow(0 0 6px rgba(255,100,0,0.8));
   transition: none;
 }
 .missile-trail {
   position: fixed; z-index: 199; pointer-events: none;
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--theme-color);
-  opacity: 0.5;
-  animation: trailFade 0.4s ease forwards;
+  width: 10px; height: 10px; border-radius: 50%;
+  opacity: 0.7;
+  animation: trailFade 0.5s ease forwards;
 }
-@keyframes trailFade { to { opacity: 0; transform: scale(0.2); } }
+.missile-trail.flame {
+  background: radial-gradient(circle, #FFD54F 30%, #FF9800 60%, transparent 100%);
+  width: 14px; height: 14px;
+}
+.missile-trail.smoke {
+  background: radial-gradient(circle, rgba(180,180,180,0.6) 30%, transparent 100%);
+  width: 10px; height: 10px;
+}
+@keyframes trailFade { to { opacity: 0; transform: scale(0.1); } }
 
 .explosion {
   position: fixed; z-index: 201; pointer-events: none;
@@ -878,6 +886,69 @@ function moveToNextBlank() {
   }
 }
 
+// ===== SOUND EFFECTS (Web Audio API) =====
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playSound(type) {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+
+    if (type === 'correct') {
+      // Ding-dong-deng (3 ascending tones)
+      [0, 0.15, 0.3].forEach((delay, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = [523, 659, 784][i]; // C5, E5, G5
+        gain.gain.setValueAtTime(0.3, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + delay + 0.3);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.3);
+      });
+    } else if (type === 'wrong') {
+      // Buzzer sound
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.value = 180;
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+    } else if (type === 'explode') {
+      // Boom! - noise burst
+      const bufferSize = ctx.sampleRate * 0.3;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 800;
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      noise.start(ctx.currentTime);
+      noise.stop(ctx.currentTime + 0.3);
+    }
+  } catch (e) { /* audio not supported */ }
+}
+
 // ===== FEEDBACK =====
 function showFeedback(correct) {
   const overlay = document.getElementById('feedback-overlay');
@@ -885,6 +956,7 @@ function showFeedback(correct) {
   overlay.classList.add('show');
   msg.className = correct ? 'feedback-msg correct' : 'feedback-msg wrong';
   msg.textContent = correct ? pick(CORRECT_MSG) : pick(WRONG_MSG);
+  playSound(correct ? 'correct' : 'wrong');
 }
 function hideFeedback() {
   document.getElementById('feedback-overlay').classList.remove('show');
@@ -988,35 +1060,51 @@ function launchMissiles(blankIdx) {
 function fireMissile(sx, sy, ex, ey, onArrive) {
   const missile = document.createElement('div');
   missile.className = 'missile';
+  missile.textContent = '\u{1F680}';
+  // Calculate angle so rocket points toward target
+  const angle = Math.atan2(ey - sy, ex - sx) * (180 / Math.PI);
+  // Rocket emoji points up by default, so rotate accordingly (up = -90deg)
+  missile.style.transform = `translate(-50%, -50%) rotate(${angle + 90}deg)`;
   missile.style.left = sx + 'px';
   missile.style.top = sy + 'px';
   document.body.appendChild(missile);
 
-  const duration = 350; // ms
+  const duration = 400; // ms
   const startTime = performance.now();
-  const trailInterval = 30;
+  const trailInterval = 25;
   let lastTrail = 0;
 
   function animate(now) {
     const elapsed = now - startTime;
     const t = Math.min(elapsed / duration, 1);
-    // Ease out quad
-    const ease = 1 - (1 - t) * (1 - t);
+    // Ease in-out for more dramatic feel
+    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
     const cx = sx + (ex - sx) * ease;
     const cy = sy + (ey - sy) * ease;
     missile.style.left = cx + 'px';
     missile.style.top = cy + 'px';
 
-    // Trail particles
+    // Trail: alternating flame and smoke
     if (now - lastTrail > trailInterval) {
       lastTrail = now;
-      const trail = document.createElement('div');
-      trail.className = 'missile-trail';
-      trail.style.left = cx + 'px';
-      trail.style.top = cy + 'px';
-      document.body.appendChild(trail);
-      setTimeout(() => trail.remove(), 400);
+      // Flame particle
+      const flame = document.createElement('div');
+      flame.className = 'missile-trail flame';
+      flame.style.left = (cx + (Math.random() - 0.5) * 6) + 'px';
+      flame.style.top = (cy + (Math.random() - 0.5) * 6) + 'px';
+      document.body.appendChild(flame);
+      setTimeout(() => flame.remove(), 500);
+
+      // Smoke particle (delayed, behind flame)
+      setTimeout(() => {
+        const smoke = document.createElement('div');
+        smoke.className = 'missile-trail smoke';
+        smoke.style.left = (cx + (Math.random() - 0.5) * 8) + 'px';
+        smoke.style.top = (cy + (Math.random() - 0.5) * 8) + 'px';
+        document.body.appendChild(smoke);
+        setTimeout(() => smoke.remove(), 600);
+      }, 50);
     }
 
     if (t < 1) {
@@ -1038,20 +1126,33 @@ function explodeAt(x, y) {
   document.body.appendChild(boom);
   setTimeout(() => boom.remove(), 700);
 
-  // Particles
-  const numParticles = 10;
+  // Boom emoji
+  const boomEmoji = document.createElement('div');
+  boomEmoji.style.cssText = `position:fixed;z-index:203;pointer-events:none;font-size:36px;left:${x}px;top:${y}px;transform:translate(-50%,-50%);`;
+  boomEmoji.textContent = '\u{1F4A5}';
+  document.body.appendChild(boomEmoji);
+  setTimeout(() => boomEmoji.remove(), 500);
+
+  // Particles - fire colors
+  const colors = ['#FF6B00', '#FFD54F', '#FF3D00', '#FFAB00', '#FF9800'];
+  const numParticles = 12;
   for (let i = 0; i < numParticles; i++) {
     const p = document.createElement('div');
     p.className = 'explosion-particle';
-    const angle = (Math.PI * 2 * i) / numParticles;
-    const dist = 20 + Math.random() * 30;
+    p.style.background = colors[i % colors.length];
+    const angle = (Math.PI * 2 * i) / numParticles + (Math.random() - 0.5) * 0.3;
+    const dist = 25 + Math.random() * 35;
     p.style.left = x + 'px';
     p.style.top = y + 'px';
+    p.style.width = (5 + Math.random() * 5) + 'px';
+    p.style.height = p.style.width;
     p.style.setProperty('--px', Math.cos(angle) * dist + 'px');
     p.style.setProperty('--py', Math.sin(angle) * dist + 'px');
     document.body.appendChild(p);
     setTimeout(() => p.remove(), 700);
   }
+
+  playSound('explode');
 }
 
 // Double-tap / double-click on blank cells
